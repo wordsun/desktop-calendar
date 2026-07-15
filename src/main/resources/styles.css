@@ -1,0 +1,155 @@
+/* 桌面日历插件 - 毛玻璃效果样式表 */
+
+/* 根容器毛玻璃背景 */
+.root {
+    -fx-background-color: transparent;
+}
+
+/* 主面板毛玻璃效果 */
+.glass-panel {
+    -fx-background-color: rgba(255, 255, 255, 0.75);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(255, 255, 255, 0.5);
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 15, 0, 0, 5);
+}
+
+/* 导航栏 */
+.nav-bar {
+    -fx-padding: 8 12 8 12;
+    -fx-background-color: transparent;
+}
+
+/* 导航按钮 */
+.nav-button {
+    -fx-background-color: transparent;
+    -fx-cursor: hand;
+    -fx-font-size: 14px;
+    -fx-text-fill: #555555;
+}
+
+.nav-button:hover {
+    -fx-background-color: rgba(0, 0, 0, 0.05);
+    -fx-background-radius: 6;
+}
+
+/* 月份标题 */
+.month-title {
+    -fx-font-family: "Microsoft YaHei";
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #333333;
+}
+
+/* 星期标题行 */
+.week-header {
+    -fx-padding: 4 0 4 0;
+    -fx-background-color: transparent;
+}
+
+.week-label {
+    -fx-font-family: "Microsoft YaHei";
+    -fx-font-size: 10px;
+    -fx-text-fill: #666666;
+    -fx-alignment: center;
+}
+
+.week-label.weekend {
+    -fx-text-fill: #E74C3C;
+}
+
+/* 日期格子 */
+.day-cell {
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+    -fx-padding: 4;
+}
+
+.day-cell:hover {
+    -fx-background-color: rgba(74, 144, 217, 0.15);
+}
+
+.day-cell.today {
+    -fx-background-color: transparent;
+}
+
+.day-cell.other-month {
+    -fx-opacity: 0.4;
+}
+
+/* 日期数字 */
+.day-number {
+    -fx-font-family: "Microsoft YaHei";
+    -fx-font-size: 14px;
+    -fx-fill: #333333;
+}
+
+.day-number.weekend {
+    -fx-fill: #E74C3C;
+}
+
+.day-number.today {
+    -fx-fill: white;
+    -fx-font-weight: bold;
+}
+
+/* 今日高亮圆圈 */
+.today-circle {
+    -fx-fill: #4A90D9;
+}
+
+/* 农历文字 */
+.lunar-text {
+    -fx-font-family: "Microsoft YaHei";
+    -fx-font-size: 9px;
+    -fx-fill: #888888;
+}
+
+.lunar-text.festival {
+    -fx-fill: #E67E22;
+}
+
+.lunar-text.solar-term {
+    -fx-fill: #E67E22;
+}
+
+/* 事件标记点 */
+.event-dot {
+    -fx-fill: #E74C3C;
+    -fx-radius: 2.5;
+}
+
+/* 今天按钮 */
+.today-button {
+    -fx-background-color: #4A90D9;
+    -fx-text-fill: white;
+    -fx-background-radius: 6;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+    -fx-padding: 4 10 4 10;
+}
+
+.today-button:hover {
+    -fx-background-color: #357ABD;
+}
+
+/* 滚动条样式 */
+.scroll-bar {
+    -fx-background-color: transparent;
+    -fx-pref-width: 4;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: rgba(0, 0, 0, 0.2);
+    -fx-background-radius: 2;
+}
+
+/* 工具提示 */
+.tooltip {
+    -fx-background-color: rgba(50, 50, 50, 0.9);
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-background-radius: 6;
+    -fx-padding: 6 10 6 10;
+}
