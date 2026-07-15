@@ -2,6 +2,7 @@ package com.desktop.calendar.view;
 
 import com.desktop.calendar.service.AutoStartService;
 import com.desktop.calendar.service.GlobalHotkeyService;
+import com.desktop.calendar.service.RemarkService;
 import com.desktop.calendar.service.TrayService;
 import com.desktop.calendar.util.I18n;
 import com.desktop.calendar.util.ThemeManager;
@@ -9,8 +10,10 @@ import com.desktop.calendar.util.ThemeManager.ThemeColor;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.*;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.Slider;
@@ -19,15 +22,19 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
+import java.io.File;
+import java.util.Optional;
 import java.util.prefs.Preferences;
 
 /**
@@ -44,6 +51,12 @@ public class SettingsDialog {
     private final GlobalHotkeyService hotkeyService;
     private final TrayService trayService;
     private final Runnable onSettingsChanged;
+    private final Runnable onResetSize;
+    private final Runnable onClearTodos;
+
+    // 拖拽偏移量
+    private double dragOffsetX;
+    private double dragOffsetY;
 
     private TextField hotkeyField;
     private CheckBox autoStartCheck;
@@ -53,16 +66,22 @@ public class SettingsDialog {
     private RadioButton langZhRadio;
     private RadioButton langEnRadio;
     private ThemeColor selectedTheme;
+    private TextField remarkPathField;
+    private ComboBox<String> fontFamilyCombo;
+    private ComboBox<Integer> fontSizeCombo;
 
     private int capturedModifiers;
     private int capturedVk;
 
     public SettingsDialog(Stage owner, GlobalHotkeyService hotkeyService,
-                          TrayService trayService, Runnable onSettingsChanged) {
+                          TrayService trayService, Runnable onSettingsChanged,
+                          Runnable onResetSize, Runnable onClearTodos) {
         this.mainStage = owner;
         this.hotkeyService = hotkeyService;
         this.trayService = trayService;
         this.onSettingsChanged = onSettingsChanged;
+        this.onResetSize = onResetSize;
+        this.onClearTodos = onClearTodos;
 
         dialog = new Stage();
         dialog.initOwner(owner);
@@ -74,7 +93,7 @@ public class SettingsDialog {
         selectedTheme = ThemeManager.getCurrentTheme();
 
         VBox root = buildUI();
-        Scene scene = new Scene(root, 310, 420, Color.TRANSPARENT);
+        Scene scene = new Scene(root, 330, 570, Color.TRANSPARENT);
         dialog.setScene(scene);
     }
 
@@ -86,6 +105,16 @@ public class SettingsDialog {
                 "-fx-background-radius: 12; -fx-border-radius: 12; " +
                 "-fx-border-color: #ddd; -fx-border-width: 1; " +
                 "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 15, 0, 0, 5);");
+
+        // 拖拽支持：鼠标拖动整个设置面板
+        root.setOnMousePressed(e -> {
+            dragOffsetX = e.getScreenX() - dialog.getX();
+            dragOffsetY = e.getScreenY() - dialog.getY();
+        });
+        root.setOnMouseDragged(e -> {
+            dialog.setX(e.getScreenX() - dragOffsetX);
+            dialog.setY(e.getScreenY() - dragOffsetY);
+        });
 
         // 标题
         Label title = new Label(I18n.get("settings.title"));
@@ -177,6 +206,106 @@ public class SettingsDialog {
 
         HBox themeRow = createThemeSelector();
 
+        // 备注目录设置
+        Label remarkLabel = new Label(I18n.get("settings.remark"));
+        remarkLabel.setFont(Font.font("Microsoft YaHei", 12));
+        remarkLabel.setTextFill(Color.web("#555555"));
+
+        remarkPathField = new TextField();
+        String savedPath = RemarkService.getSavedRemarkDir();
+        remarkPathField.setText(savedPath.isEmpty() ? RemarkService.getRemarkDir().toString() : savedPath);
+        remarkPathField.setPromptText(I18n.get("settings.remark.prompt"));
+        remarkPathField.setStyle("-fx-font-size: 12; -fx-padding: 6 8; -fx-background-radius: 6;");
+        HBox.setHgrow(remarkPathField, Priority.ALWAYS);
+
+        Button browseBtn = new Button("...");
+        browseBtn.setStyle("-fx-background-color: " + themeHex + "; -fx-text-fill: white; " +
+                "-fx-background-radius: 6; -fx-font-size: 12; -fx-cursor: hand; -fx-padding: 4 10;");
+        browseBtn.setOnAction(e -> {
+            DirectoryChooser chooser = new DirectoryChooser();
+            chooser.setTitle(I18n.get("settings.remark.browse"));
+            String current = remarkPathField.getText().trim();
+            if (!current.isEmpty()) {
+                File dir = new File(current);
+                if (dir.exists() && dir.isDirectory()) {
+                    chooser.setInitialDirectory(dir);
+                }
+            }
+            File selected = chooser.showDialog(dialog);
+            if (selected != null) {
+                remarkPathField.setText(selected.getAbsolutePath());
+            }
+        });
+
+        HBox remarkRow = new HBox(6);
+        remarkRow.setAlignment(Pos.CENTER_LEFT);
+        remarkRow.getChildren().addAll(remarkPathField, browseBtn);
+
+        // 待办字体设置
+        Label fontLabel = new Label(I18n.get("settings.todoFont"));
+        fontLabel.setFont(Font.font("Microsoft YaHei", 12));
+        fontLabel.setTextFill(Color.web("#555555"));
+
+        fontFamilyCombo = new ComboBox<>();
+        fontFamilyCombo.getItems().addAll(
+                "Microsoft YaHei", "SimSun", "SimHei", "KaiTi", "FangSong",
+                "Arial", "Consolas", "Courier New"
+        );
+        fontFamilyCombo.setValue(TodoListDialog.getSavedFontFamily());
+        fontFamilyCombo.setStyle("-fx-font-size: 12; -fx-background-radius: 6;");
+        fontFamilyCombo.setPrefWidth(160);
+
+        fontSizeCombo = new ComboBox<>();
+        for (int s = 10; s <= 24; s++) fontSizeCombo.getItems().add(s);
+        fontSizeCombo.setValue(TodoListDialog.getSavedFontSize());
+        fontSizeCombo.setStyle("-fx-font-size: 12; -fx-background-radius: 6;");
+        fontSizeCombo.setPrefWidth(70);
+
+        Label fontPreview = new Label(I18n.get("settings.todoFontSize"));
+        fontPreview.setFont(Font.font("Microsoft YaHei", 11));
+        fontPreview.setTextFill(Color.web("#999999"));
+
+        HBox fontRow = new HBox(8);
+        fontRow.setAlignment(Pos.CENTER_LEFT);
+        fontRow.getChildren().addAll(fontFamilyCombo, fontSizeCombo, fontPreview);
+
+        // 恢复默认大小按钮
+        Button resetSizeBtn = new Button(I18n.get("settings.resetSize"));
+        resetSizeBtn.setStyle("-fx-background-color: #eee; -fx-text-fill: #555; " +
+                "-fx-background-radius: 6; -fx-font-size: 12; -fx-cursor: hand; -fx-padding: 6 14;");
+        resetSizeBtn.setOnAction(e -> {
+            if (onResetSize != null) {
+                onResetSize.run();
+            }
+        });
+
+        HBox resetRow = new HBox(resetSizeBtn);
+        resetRow.setAlignment(Pos.CENTER_LEFT);
+
+        // 一键清空待办
+        Label clearLabel = new Label(I18n.get("settings.clearTodos"));
+        clearLabel.setFont(Font.font("Microsoft YaHei", 12));
+        clearLabel.setTextFill(Color.web("#555555"));
+
+        Button clearTodosBtn = new Button(I18n.get("settings.clearTodos.button"));
+        clearTodosBtn.setStyle("-fx-background-color: #E74C3C; -fx-text-fill: white; " +
+                "-fx-background-radius: 6; -fx-font-size: 12; -fx-cursor: hand; -fx-padding: 6 14;");
+        clearTodosBtn.setOnAction(e -> {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+            confirm.setTitle(I18n.get("settings.clearTodos.confirm.title"));
+            confirm.setHeaderText(null);
+            confirm.setContentText(I18n.get("settings.clearTodos.confirm.text"));
+            Optional<ButtonType> result = confirm.showAndWait();
+            if (result.isPresent() && result.get() == ButtonType.OK) {
+                if (onClearTodos != null) {
+                    onClearTodos.run();
+                }
+            }
+        });
+
+        HBox clearRow = new HBox(clearTodosBtn);
+        clearRow.setAlignment(Pos.CENTER_LEFT);
+
         // 按钮行
         HBox buttonRow = new HBox(10);
         buttonRow.setAlignment(Pos.CENTER_RIGHT);
@@ -201,7 +330,9 @@ public class SettingsDialog {
 
         root.getChildren().addAll(title, hotkeyLabel, hotkeyField, autoStartCheck,
                 opacityLabel, opacityRow, langLabel, langRow,
-                themeLabel, themeRow, buttonRow);
+                themeLabel, themeRow,
+                remarkLabel, remarkRow,
+                fontLabel, fontRow, resetRow, clearRow, buttonRow);
         return root;
     }
 
@@ -300,6 +431,18 @@ public class SettingsDialog {
 
         // 保存主题色
         ThemeManager.setTheme(selectedTheme);
+
+        // 保存备注目录路径
+        String remarkPath = remarkPathField.getText().trim();
+        RemarkService.setRemarkDir(remarkPath);
+
+        // 保存待办字体设置
+        if (fontFamilyCombo.getValue() != null) {
+            TodoListDialog.setFontFamily(fontFamilyCombo.getValue());
+        }
+        if (fontSizeCombo.getValue() != null) {
+            TodoListDialog.setFontSize(fontSizeCombo.getValue());
+        }
 
         // 通知视图刷新
         if (onSettingsChanged != null) {

@@ -1,6 +1,7 @@
 package com.desktop.calendar.controller;
 
 import com.desktop.calendar.model.CalendarEvent;
+import com.desktop.calendar.model.HolidayConfig;
 import com.desktop.calendar.model.LunarDate;
 import com.desktop.calendar.service.CalendarService;
 import com.desktop.calendar.service.LunarService;
@@ -116,22 +117,23 @@ public class CalendarController {
     }
 
     /**
-     * 查询某日是否为假日（法定假日 + 农历传统节日）
+     * 获取指定日期的 DayType（渲染层直接映射颜色）
+     */
+    public HolidayConfig.DayType getDayType(LocalDate date) {
+        return calendarService.getDayType(date);
+    }
+
+    /**
+     * 查询某日是否为假日（法定假日 + 农历传统节日 + 节气清明）
      */
     public boolean isHoliday(LocalDate date) {
-        // 先查静态假日配置
-        if (calendarService.getHoliday(date).isPresent()) {
-            return true;
-        }
-        // 再查农历传统节日
+        HolidayConfig.DayType dt = calendarService.getDayType(date);
+        if (dt == HolidayConfig.DayType.HOLIDAY) return true;
+        // 农历传统节日
         LunarDate lunar = lunarService.toLunar(date);
-        if (lunar != null && lunar.getFestival() != null) {
-            return true;
-        }
+        if (lunar != null && lunar.getFestival() != null) return true;
         // 仅清明是法定假期的节气
-        if (lunar != null && "清明".equals(lunar.getSolarTerm())) {
-            return true;
-        }
+        if (lunar != null && "清明".equals(lunar.getSolarTerm())) return true;
         return false;
     }
 
@@ -146,7 +148,15 @@ public class CalendarController {
      * 查询某日是否为调休工作日
      */
     public boolean isWorkday(LocalDate date) {
-        return calendarService.isWorkday(date);
+        return calendarService.getDayType(date) == HolidayConfig.DayType.ADJUSTED_WORKDAY;
+    }
+
+    /**
+     * 清空所有日程事件
+     * @return 被清除的事件总数
+     */
+    public int clearAllEvents() {
+        return calendarService.clearAllEvents();
     }
 
     /**

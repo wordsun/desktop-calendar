@@ -25,12 +25,17 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import java.util.prefs.Preferences;
 
 /**
  * 待办事项查看/管理弹窗
  * 双击日期时弹出，展示该日期所有待办，支持添加和删除
  */
 public class TodoListDialog {
+
+    private static final Preferences PREFS = Preferences.userNodeForPackage(TodoListDialog.class);
+    private static final String KEY_FONT_FAMILY = "todo_font_family";
+    private static final String KEY_FONT_SIZE = "todo_font_size";
 
     private final Stage dialog;
     private final CalendarController controller;
@@ -51,7 +56,7 @@ public class TodoListDialog {
         dialog.setResizable(false);
 
         VBox root = buildUI();
-        Scene scene = new Scene(root, 320, 420, Color.TRANSPARENT);
+        Scene scene = new Scene(root, 320, 330, Color.TRANSPARENT);
         dialog.setScene(scene);
     }
 
@@ -68,7 +73,7 @@ public class TodoListDialog {
         String dateStr = date.format(DateTimeFormatter.ofPattern("yyyy年M月d日"));
         Label titleLabel = new Label("📋 " + dateStr + " 待办事项");
         titleLabel.setFont(Font.font("Microsoft YaHei", FontWeight.BOLD, 15));
-        titleLabel.setTextFill(Color.web("#333333"));
+        titleLabel.setTextFill(Color.web("#1a1a1a"));
 
         // 待办列表区域
         listContainer = new VBox(6);
@@ -81,13 +86,6 @@ public class TodoListDialog {
                 "-fx-padding: 0; -fx-border-color: #eee; -fx-border-radius: 6;");
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
-        // 分隔线
-        Label divider = new Label("──────── 添加新待办 ────────");
-        divider.setFont(Font.font("Microsoft YaHei", 11));
-        divider.setTextFill(Color.web("#999999"));
-        divider.setAlignment(Pos.CENTER);
-        divider.setMaxWidth(Double.MAX_VALUE);
-
         // 添加表单
         TextField titleField = new TextField();
         titleField.setPromptText("输入待办事项...");
@@ -99,41 +97,29 @@ public class TodoListDialog {
         descArea.setWrapText(true);
         descArea.setStyle("-fx-font-size: 12; -fx-padding: 6; -fx-background-radius: 6;");
 
-        Button addBtn = new Button("➕ 添加");
-        addBtn.setStyle("-fx-background-color: " + themeHex + "; -fx-text-fill: white; " +
-                "-fx-background-radius: 6; -fx-font-size: 12; -fx-cursor: hand; -fx-padding: 6 14;");
-        addBtn.setOnAction(e -> {
-            String title = titleField.getText().trim();
-            if (title.isEmpty()) {
-                titleField.setPromptText("请先输入待办内容！");
-                return;
-            }
-            CalendarEvent event = CalendarEvent.builder()
-                    .id(UUID.randomUUID().toString())
-                    .title(title)
-                    .description(descArea.getText().trim())
-                    .date(date)
-                    .allDay(true)
-                    .build();
-            controller.addEvent(event);
-            titleField.clear();
-            descArea.clear();
-            refreshList();
-            if (onChanged != null) onChanged.run();
-        });
-
-        HBox addRow = new HBox(8, titleField, addBtn);
-        addRow.setAlignment(Pos.CENTER_LEFT);
-
-        // 关闭按钮
-        Button closeBtn = new Button("关闭");
-        closeBtn.setStyle("-fx-background-color: #eee; -fx-text-fill: #555; " +
+        // 保存并关闭按钮（同时处理添加逻辑）
+        Button saveCloseBtn = new Button("保存并关闭");
+        saveCloseBtn.setStyle("-fx-background-color: " + themeHex + "; -fx-text-fill: white; " +
                 "-fx-background-radius: 6; -fx-font-size: 12; -fx-cursor: hand; -fx-padding: 6 20;");
-        closeBtn.setOnAction(e -> dialog.close());
-        HBox buttonRow = new HBox(closeBtn);
+        saveCloseBtn.setOnAction(e -> {
+            String title = titleField.getText().trim();
+            if (!title.isEmpty()) {
+                CalendarEvent event = CalendarEvent.builder()
+                        .id(UUID.randomUUID().toString())
+                        .title(title)
+                        .description(descArea.getText().trim())
+                        .date(date)
+                        .allDay(true)
+                        .build();
+                controller.addEvent(event);
+                if (onChanged != null) onChanged.run();
+            }
+            dialog.close();
+        });
+        HBox buttonRow = new HBox(saveCloseBtn);
         buttonRow.setAlignment(Pos.CENTER);
 
-        root.getChildren().addAll(titleLabel, scrollPane, divider, titleField, descArea, addRow, buttonRow);
+        root.getChildren().addAll(titleLabel, scrollPane, titleField, descArea, buttonRow);
 
         // 初始加载待办列表
         refreshList();
@@ -151,7 +137,9 @@ public class TodoListDialog {
         if (events.isEmpty()) {
             Label emptyLabel = new Label("  暂无待办事项");
             emptyLabel.setFont(Font.font("Microsoft YaHei", 12));
-            emptyLabel.setTextFill(Color.web("#999999"));
+            // 强制着色策略：代码级 setTextFill 最高优先级 + 内联样式兜底
+            emptyLabel.setTextFill(Color.BLACK);
+            emptyLabel.setStyle("-fx-text-fill: black; -fx-font-family: 'Microsoft YaHei'; -fx-font-size: 12px;");
             listContainer.getChildren().add(emptyLabel);
             return;
         }
@@ -174,16 +162,25 @@ public class TodoListDialog {
         // 待办内容
         VBox content = new VBox(2);
         Label titleLabel = new Label("☐ " + event.getTitle());
-        titleLabel.setFont(Font.font("Microsoft YaHei", 13));
-        titleLabel.setTextFill(Color.web("#333333"));
+        String fontFamily = getSavedFontFamily();
+        int fontSize = getSavedFontSize();
+        titleLabel.setStyle(String.format(
+            "-fx-font-family: '%s'; -fx-font-size: %dpx; -fx-text-fill: #1a1a1a;",
+            fontFamily, fontSize));
+        titleLabel.setTextFill(Color.web("#1a1a1a"));
+        titleLabel.setWrapText(true);
+        titleLabel.setMaxWidth(260);
 
         content.getChildren().add(titleLabel);
 
         if (event.getDescription() != null && !event.getDescription().isEmpty()) {
             Label descLabel = new Label("    " + event.getDescription());
-            descLabel.setFont(Font.font("Microsoft YaHei", 11));
-            descLabel.setTextFill(Color.web("#888888"));
+            descLabel.setStyle(String.format(
+                "-fx-font-family: '%s'; -fx-font-size: %dpx; -fx-text-fill: #555555;",
+                fontFamily, Math.max(10, fontSize - 2)));
+            descLabel.setTextFill(Color.web("#555555"));
             descLabel.setWrapText(true);
+            descLabel.setMaxWidth(260);
             content.getChildren().add(descLabel);
         }
 
@@ -210,5 +207,34 @@ public class TodoListDialog {
 
     public void show() {
         dialog.showAndWait();
+    }
+
+    /** 读取保存的待办字体（含空值/无效值校验，fallback 到 System） */
+    public static String getSavedFontFamily() {
+        String family = PREFS.get(KEY_FONT_FAMILY, "Microsoft YaHei");
+        if (family == null || family.trim().isEmpty()) {
+            return "Microsoft YaHei";
+        }
+        // 尝试解析字体，如果无效则 fallback
+        Font testFont = Font.font(family.trim(), 13);
+        if (testFont == null || testFont.getFamily().contains("System")) {
+            // 字体可能不可用，但保留用户选择，JavaFX 会自动 fallback
+        }
+        return family.trim();
+    }
+
+    /** 保存待办字体 */
+    public static void setFontFamily(String family) {
+        PREFS.put(KEY_FONT_FAMILY, family);
+    }
+
+    /** 读取保存的待办字号 */
+    public static int getSavedFontSize() {
+        return PREFS.getInt(KEY_FONT_SIZE, 13);
+    }
+
+    /** 保存待办字号 */
+    public static void setFontSize(int size) {
+        PREFS.putInt(KEY_FONT_SIZE, size);
     }
 }

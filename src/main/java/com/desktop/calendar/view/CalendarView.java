@@ -34,6 +34,7 @@ public class CalendarView {
     private GlobalHotkeyService hotkeyService;
     private TrayService trayService;
     private Stage ownerStage;
+    private Runnable resetSizeCallback;
 
     public CalendarView(StorageService storageService) {
         CalendarService calendarService = new CalendarService(storageService);
@@ -123,11 +124,29 @@ public class CalendarView {
     /**
      * 打开设置面板
      */
+    /**
+     * 设置重置窗口大小的回调（在 Main 中调用）
+     */
+    public void setResetSizeCallback(Runnable callback) {
+        this.resetSizeCallback = callback;
+        monthView.setResetSizeCallback(callback);
+    }
+
     private void openSettings() {
         if (ownerStage != null && hotkeyService != null && trayService != null) {
-            SettingsDialog dialog = new SettingsDialog(ownerStage, hotkeyService, trayService, this::applySettings);
+            SettingsDialog dialog = new SettingsDialog(ownerStage, hotkeyService, trayService,
+                    this::applySettings, resetSizeCallback, this::clearAllTodos);
             dialog.show();
         }
+    }
+
+    /**
+     * 清空所有待办并刷新视图
+     */
+    private void clearAllTodos() {
+        int count = controller.clearAllEvents();
+        System.out.println("已清空 " + count + " 条待办事项");
+        refreshMonth();
     }
 
     /**

@@ -7,8 +7,7 @@ import java.util.prefs.Preferences;
 
 /**
  * 主题色管理器
- * 支持5种主题色：蓝色、绿色、橙色、紫色、红色
- * 持久化到 Preferences，提供实时预览属性
+ * 支持5种预设主题色，通过 Preferences 持久化
  */
 public class ThemeManager {
 
@@ -59,7 +58,7 @@ public class ThemeManager {
 
     /** 获取当前主题色枚举 */
     public static ThemeColor getCurrentTheme() {
-        String hex = getCurrentColorHex();
+        String hex = INSTANCE.currentColorHex.get();
         for (ThemeColor tc : ThemeColor.values()) {
             if (tc.hex.equals(hex)) return tc;
         }

@@ -9,26 +9,46 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.prefs.Preferences;
 
 /**
  * 待办事项 Markdown 文件服务
- * 在程序所在目录的 remark/ 下按 YYYY-MM-DD.md 格式读写每日待办
+ * 在可配置的 remark/ 目录下按 YYYY-MM-DD.md 格式读写每日待办
+ * 路径可通过 Preferences 配置，默认在程序运行目录的 remark/ 下
  */
 public class RemarkService {
 
-    private static final Path REMARK_DIR;
+    private static final Preferences PREFS = Preferences.userNodeForPackage(RemarkService.class);
+    private static final String KEY_REMARK_DIR = "remark_dir";
 
-    static {
-        // 程序所在目录下的 remark 文件夹
-        String jarDir = System.getProperty("user.dir");
-        REMARK_DIR = Paths.get(jarDir, "remark");
+    /**
+     * 获取当前 remark 根目录路径
+     */
+    public static Path getRemarkDir() {
+        String customPath = PREFS.get(KEY_REMARK_DIR, null);
+        if (customPath != null && !customPath.trim().isEmpty()) {
+            return Paths.get(customPath.trim());
+        }
+        // 默认：程序运行目录下的 remark
+        return Paths.get(System.getProperty("user.dir"), "remark");
     }
 
     /**
-     * 获取 remark 目录路径
+     * 设置 remark 目录路径（保存到 Preferences）
      */
-    public static Path getRemarkDir() {
-        return REMARK_DIR;
+    public static void setRemarkDir(String path) {
+        if (path == null || path.trim().isEmpty()) {
+            PREFS.remove(KEY_REMARK_DIR);
+        } else {
+            PREFS.put(KEY_REMARK_DIR, path.trim());
+        }
+    }
+
+    /**
+     * 获取已保存的 remark 目录路径（用于设置面板显示）
+     */
+    public static String getSavedRemarkDir() {
+        return PREFS.get(KEY_REMARK_DIR, "");
     }
 
     /**
@@ -71,7 +91,7 @@ public class RemarkService {
      * 格式：remark/YYYY/MM/DD.md
      */
     private static Path getDayFile(LocalDate date) {
-        return REMARK_DIR.resolve(
+        return getRemarkDir().resolve(
                 String.format("%04d/%02d/%02d.md",
                         date.getYear(), date.getMonthValue(), date.getDayOfMonth())
         );
@@ -103,9 +123,10 @@ public class RemarkService {
      * 清理空目录（日期文件删除后，尝试删除空的月/年目录）
      */
     private static void cleanupEmptyDirs(LocalDate date) throws IOException {
-        Path monthDir = REMARK_DIR.resolve(
+        Path remarkDir = getRemarkDir();
+        Path monthDir = remarkDir.resolve(
                 String.format("%04d/%02d", date.getYear(), date.getMonthValue()));
-        Path yearDir = REMARK_DIR.resolve(String.valueOf(date.getYear()));
+        Path yearDir = remarkDir.resolve(String.valueOf(date.getYear()));
 
         // 删除空的月份目录
         if (Files.exists(monthDir) && isDirEmpty(monthDir)) {

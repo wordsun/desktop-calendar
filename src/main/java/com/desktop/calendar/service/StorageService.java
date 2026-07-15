@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -44,14 +45,21 @@ public class StorageService {
 
     /**
      * 初始化存储目录和默认配置文件
+     * 每次启动时从 classpath 资源文件加载默认节假日配置，确保配置始终保持最新
      */
     public void init() {
         try {
             Files.createDirectories(dataPath);
 
-            // 如果节假日配置文件不存在，创建默认配置
-            if (!Files.exists(holidayFile)) {
-                saveHolidayConfig(createDefaultHolidayConfig());
+            // 每次启动从资源文件加载默认节假日配置
+            try (InputStream in = getClass().getResourceAsStream("/holidays_2026.json")) {
+                if (in != null) {
+                    String content = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    Files.writeString(holidayFile, content, java.nio.charset.StandardCharsets.UTF_8);
+                    System.out.println("默认节假日配置已从资源文件加载");
+                } else {
+                    System.err.println("默认节假日资源文件 /holidays_2026.json 未找到");
+                }
             }
 
             // 如果日程文件不存在，创建空文件
@@ -123,6 +131,7 @@ public class StorageService {
     /**
      * 从在线API自动更新节假日数据（timor.tech 免费API）
      * 每次启动时后台调用，失败不影响正常使用
+     * 拉取本年数据；若国家已发布次年数据则一并更新
      */
     public void autoUpdateHolidays() {
         int currentYear = LocalDate.now().getYear();
@@ -134,6 +143,21 @@ public class StorageService {
             }
         } catch (Exception e) {
             System.err.println("自动更新节假日失败(使用本地缓存): " + e.getMessage());
+        }
+
+        // 尝试拉取下一年数据（若 API 已发布则更新，否则保持本地默认）
+        int nextYear = currentYear + 1;
+        try {
+            String nextYearFile = DATA_DIR + "/holidays_" + nextYear + ".json";
+            if (!Files.exists(Paths.get(nextYearFile))) {
+                HolidayConfig nextConfig = fetchHolidayFromApi(nextYear);
+                if (nextConfig != null && nextConfig.getHolidays() != null && !nextConfig.getHolidays().isEmpty()) {
+                    JsonUtil.writeToFile(Paths.get(nextYearFile), nextConfig);
+                    System.out.println("次年节假日数据已获取: " + nextYear + "年");
+                }
+            }
+        } catch (Exception e) {
+            // 次年数据尚未发布或 API 不可用，静默跳过
         }
     }
 
@@ -197,68 +221,4 @@ public class StorageService {
         }
     }
 
-    /**
-     * 创建 2026 年默认节假日配置（基于国务院办公厅发布格式）
-     */
-    private HolidayConfig createDefaultHolidayConfig() {
-        List<HolidayConfig.Holiday> holidays = new ArrayList<>();
-
-        // 元旦 1.1-1.3
-        holidays.add(HolidayConfig.Holiday.builder().name("元旦").date("01-01").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("元旦").date("01-02").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("元旦").date("01-03").type("LEGAL").build());
-
-        // 春节 1.26-2.1（农历除夕到正月初七）
-        holidays.add(HolidayConfig.Holiday.builder().name("春节").date("01-26").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("春节").date("01-27").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("春节").date("01-28").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("春节").date("01-29").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("春节").date("01-30").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("春节").date("01-31").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("春节").date("02-01").type("LEGAL").build());
-
-        // 清明节 4.4-4.6
-        holidays.add(HolidayConfig.Holiday.builder().name("清明节").date("04-04").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("清明节").date("04-05").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("清明节").date("04-06").type("LEGAL").build());
-
-        // 劳动节 5.1-5.5
-        holidays.add(HolidayConfig.Holiday.builder().name("劳动节").date("05-01").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("劳动节").date("05-02").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("劳动节").date("05-03").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("劳动节").date("05-04").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("劳动节").date("05-05").type("LEGAL").build());
-
-        // 端午节 5.31-6.2
-        holidays.add(HolidayConfig.Holiday.builder().name("端午节").date("05-31").type("TRADITIONAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("端午节").date("06-01").type("TRADITIONAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("端午节").date("06-02").type("TRADITIONAL").build());
-
-        // 中秋节 9.25-9.27
-        holidays.add(HolidayConfig.Holiday.builder().name("中秋节").date("09-25").type("TRADITIONAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("中秋节").date("09-26").type("TRADITIONAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("中秋节").date("09-27").type("TRADITIONAL").build());
-
-        // 国庆节 10.1-10.7
-        holidays.add(HolidayConfig.Holiday.builder().name("国庆节").date("10-01").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("国庆节").date("10-02").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("国庆节").date("10-03").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("国庆节").date("10-04").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("国庆节").date("10-05").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("国庆节").date("10-06").type("LEGAL").build());
-        holidays.add(HolidayConfig.Holiday.builder().name("国庆节").date("10-07").type("LEGAL").build());
-
-        // 调休工作日
-        Map<String, String> workdays = new HashMap<>();
-        workdays.put("2026-01-24", "春节");  // 周六上班
-        workdays.put("2026-02-07", "春节");  // 周六上班
-        workdays.put("2026-04-26", "劳动节"); // 周日上班
-        workdays.put("2026-10-10", "国庆节"); // 周六上班
-
-        return HolidayConfig.builder()
-                .year(2026)
-                .holidays(holidays)
-                .workdays(workdays)
-                .build();
-    }
 }

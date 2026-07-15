@@ -36,3 +36,9 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Temp run files ###
+run.bat
+run_log.txt
+run_output.txt
+*.bak

@@ -1,5 +1,6 @@
 package com.desktop.calendar.view;
 
+import com.desktop.calendar.model.HolidayConfig;
 import com.desktop.calendar.model.LunarDate;
 import com.desktop.calendar.util.DateUtil;
 import com.desktop.calendar.util.StyleUtil;
@@ -17,21 +18,23 @@ import javafx.scene.text.Text;
 
 /**
  * 日期单元格
- * 渲染单个日期格子：公历日期(大)、农历/节气/节日(小)、假日/调休标记
+ * 根据 DayType 枚举直接映射颜色，避免多重 if-else
  */
 public class DayCell {
+
+    /** 调休工作日绿色 */
+    private static final String ADJUSTED_WORKDAY_COLOR = "#27AE60";
 
     private final VBox container;
 
     public DayCell(LocalDate date, LunarDate lunarDate, boolean isCurrentMonth,
-                   boolean hasEvent, boolean isHoliday, boolean isWorkday) {
+                   boolean hasEvent, HolidayConfig.DayType dayType) {
         container = new VBox(2);
         container.setAlignment(Pos.CENTER);
         container.setPrefSize(48, 62);
         container.setStyle("-fx-background-radius: 6; -fx-cursor: hand;");
 
         boolean isToday = DateUtil.isToday(date);
-        boolean isWeekend = DateUtil.isWeekend(date);
 
         // 公历日期
         Text dayText = new Text(String.valueOf(date.getDayOfMonth()));
@@ -50,17 +53,14 @@ public class DayCell {
         } else {
             if (!isCurrentMonth) {
                 dayText.setFill(Color.web("#CCCCCC"));
-            } else if (isHoliday && !isWorkday) {
-                // 法定假日/传统节日/节气：标红
-                dayText.setFill(Color.web("#E74C3C"));
-            } else if (isWorkday && isWeekend) {
-                // 调休工作日（周末但要上班）：橙色
-                dayText.setFill(Color.web("#E67E22"));
-            } else if (isWeekend) {
-                // 普通周末：红色
-                dayText.setFill(Color.web(StyleUtil.WEEKEND_COLOR));
             } else {
-                dayText.setFill(Color.web("#333333"));
+                // 根据 DayType 枚举直接映射颜色
+                dayText.setFill(switch (dayType) {
+                    case HOLIDAY -> Color.web("#E74C3C");          // 法定假日：红色
+                    case ADJUSTED_WORKDAY -> Color.web(ADJUSTED_WORKDAY_COLOR); // 调休补班：绿色
+                    case NORMAL_WEEKEND -> Color.web(StyleUtil.WEEKEND_COLOR);  // 周末：红色
+                    case NORMAL_WORKDAY -> Color.web("#333333");   // 工作日：深灰
+                });
             }
             container.getChildren().add(dayText);
         }
@@ -77,7 +77,7 @@ public class DayCell {
             } else if (lunarDate.getSolarTerm() != null) {
                 // 节气：草绿色
                 lunarText.setFill(Color.web(StyleUtil.SOLAR_TERM_COLOR));
-            } else if (isHoliday && !isWorkday) {
+            } else if (dayType == HolidayConfig.DayType.HOLIDAY) {
                 // 法定假日：红色
                 lunarText.setFill(Color.web("#E74C3C"));
             } else {
@@ -92,14 +92,14 @@ public class DayCell {
         }
 
         // 底部标记行
-        if (isWorkday && isWeekend) {
-            // 调休工作日：显示 "班"
+        if (dayType == HolidayConfig.DayType.ADJUSTED_WORKDAY) {
+            // 调休工作日：显示绿色 "班"
             Text mark = new Text("班");
             mark.setFont(Font.font("Microsoft YaHei", 8));
-            mark.setFill(Color.web("#E67E22"));
+            mark.setFill(Color.web(ADJUSTED_WORKDAY_COLOR));
             container.getChildren().add(mark);
-        } else if (isHoliday && !isWorkday && isCurrentMonth) {
-            // 假日：显示 "休"
+        } else if (dayType == HolidayConfig.DayType.HOLIDAY && isCurrentMonth) {
+            // 法定假日：显示红色 "休"
             Text mark = new Text("休");
             mark.setFont(Font.font("Microsoft YaHei", 8));
             mark.setFill(Color.web("#E74C3C"));

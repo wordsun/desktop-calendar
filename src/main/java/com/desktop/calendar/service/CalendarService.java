@@ -77,6 +77,23 @@ public class CalendarService {
     }
 
     /**
+     * 清空所有日程事件，同步清理 remark MD 文件
+     * @return 被清除的事件总数
+     */
+    public int clearAllEvents() {
+        List<CalendarEvent> events = storageService.loadEvents();
+        int count = events.size();
+        if (count > 0) {
+            // 清除每个日期的 remark MD 文件
+            for (CalendarEvent event : events) {
+                RemarkService.saveDayEvents(event.getDate(), new ArrayList<>());
+            }
+            storageService.saveEvents(new ArrayList<>());
+        }
+        return count;
+    }
+
+    /**
      * 同步指定日期的待办到 remark MD 文件
      */
     private void syncRemarkFile(LocalDate date) {
@@ -85,26 +102,40 @@ public class CalendarService {
     }
 
     /**
-     * 查询某日是否为节假日
+     * 获取指定日期的 DayType（统一判断逻辑，渲染层直接映射颜色）
+     * 优先级：法定假日 > 调休工作日 > 普通周末 > 普通工作日
+     * 仅当日期年份与配置年份匹配时才返回假日/调休数据
      */
-    public Optional<HolidayConfig.Holiday> getHoliday(LocalDate date) {
-        if (holidayConfig == null || holidayConfig.getHolidays() == null) {
-            return Optional.empty();
-        }
+    public HolidayConfig.DayType getDayType(LocalDate date) {
         String mmdd = date.format(DateUtil.SHORT_DATE_FMT);
-        return holidayConfig.getHolidays().stream()
-                .filter(h -> h.getDate().equals(mmdd))
-                .findFirst();
-    }
+        String fullDate = DateUtil.formatDate(date);
+        int year = date.getYear();
 
-    /**
-     * 查询某日是否为调休工作日
-     */
-    public boolean isWorkday(LocalDate date) {
-        if (holidayConfig == null || holidayConfig.getWorkdays() == null) {
-            return false;
+        // 仅当配置年份与查询日期年份一致时才生效（防止跨年误匹配）
+        if (holidayConfig != null && holidayConfig.getYear() == year) {
+            // 1. 检查是否为法定假日（国家发布）
+            if (holidayConfig.getHolidays() != null) {
+                for (HolidayConfig.Holiday h : holidayConfig.getHolidays()) {
+                    if (h.getDate().equals(mmdd)) {
+                        return HolidayConfig.DayType.HOLIDAY;
+                    }
+                }
+            }
+
+            // 2. 检查是否为调休工作日（周末补班）
+            if (holidayConfig.getWorkdays() != null
+                    && holidayConfig.getWorkdays().containsKey(fullDate)) {
+                return HolidayConfig.DayType.ADJUSTED_WORKDAY;
+            }
         }
-        return holidayConfig.getWorkdays().containsKey(DateUtil.formatDate(date));
+
+        // 3. 默认周末判断
+        if (DateUtil.isWeekend(date)) {
+            return HolidayConfig.DayType.NORMAL_WEEKEND;
+        }
+
+        // 4. 普通工作日
+        return HolidayConfig.DayType.NORMAL_WORKDAY;
     }
 
     /**

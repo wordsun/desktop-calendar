@@ -24,8 +24,8 @@ public class WindowManager {
     private static final double DEFAULT_WIDTH = 384;
     private static final double DEFAULT_HEIGHT = 480;
     private static final double DEFAULT_SCALE = 1.0;
-    public static final double MIN_SCALE = 0.6;
-    public static final double MAX_SCALE = 2.0;
+    public static final double MIN_SCALE = 0.8;
+    public static final double MAX_SCALE = 1.2;
     public static final double SCALE_STEP = 0.1;
 
     /**

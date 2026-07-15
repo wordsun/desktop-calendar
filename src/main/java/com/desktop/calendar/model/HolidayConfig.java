@@ -9,6 +9,14 @@ import java.util.Map;
  */
 public class HolidayConfig {
 
+    /** 日期类型枚举 — 渲染层根据 type 直接映射颜色 */
+    public enum DayType {
+        NORMAL_WORKDAY,   // 普通工作日（周一~周五，未被调整）
+        NORMAL_WEEKEND,   // 普通周末（周六/周日，未被调整）
+        HOLIDAY,          // 法定假日（国家发布）
+        ADJUSTED_WORKDAY  // 调休工作日（周末被调整为上班）
+    }
+
     private int year;
     private List<Holiday> holidays;
     private Map<String, String> workdays;

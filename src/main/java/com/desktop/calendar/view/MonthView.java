@@ -1,6 +1,7 @@
 package com.desktop.calendar.view;
 
 import com.desktop.calendar.controller.CalendarController;
+import com.desktop.calendar.model.HolidayConfig;
 import com.desktop.calendar.model.LunarDate;
 import com.desktop.calendar.service.GlobalHotkeyService;
 import com.desktop.calendar.service.TrayService;
@@ -31,6 +32,7 @@ public class MonthView {
     private GlobalHotkeyService hotkeyService;
     private TrayService trayService;
     private Runnable refreshCallback;
+    private Runnable resetSizeCallback;
     private ContextMenu currentMenu; // 当前打开的右键菜单（保证同时只有一个）
 
     public MonthView(CalendarController controller) {
@@ -68,11 +70,10 @@ public class MonthView {
         for (LocalDate date : gridDates) {
             boolean isCurrentMonth = date.getMonthValue() == currentMonth.getMonthValue();
             boolean hasEvent = eventDates.contains(date);
-            boolean isHoliday = controller.isHoliday(date);
-            boolean isWorkday = controller.isWorkday(date);
+            HolidayConfig.DayType dayType = controller.getDayType(date);
             LunarDate lunarDate = controller.getLunarDate(date);
 
-            DayCell cell = new DayCell(date, lunarDate, isCurrentMonth, hasEvent, isHoliday, isWorkday);
+            DayCell cell = new DayCell(date, lunarDate, isCurrentMonth, hasEvent, dayType);
 
             // 鼠标事件：单击选择、双击添加待办、右键菜单
             cell.getView().setOnMouseClicked(e -> {
@@ -109,6 +110,13 @@ public class MonthView {
             TodoListDialog dialog = new TodoListDialog(ownerStage, controller, date, refreshCallback);
             dialog.show();
         });
+    }
+
+    /**
+     * 设置重置窗口大小回调
+     */
+    public void setResetSizeCallback(Runnable callback) {
+        this.resetSizeCallback = callback;
     }
 
     /**
@@ -156,7 +164,15 @@ public class MonthView {
             System.exit(0);
         });
 
-        menu.getItems().addAll(addTodo, new javafx.scene.control.SeparatorMenuItem(), minimize, hideToTray, close);
+        // 重置窗口大小（兜底恢复机制）
+        if (resetSizeCallback != null) {
+            MenuItem resetSize = new MenuItem(I18n.get("settings.resetSize"));
+            resetSize.setOnAction(e -> resetSizeCallback.run());
+            menu.getItems().addAll(addTodo, new javafx.scene.control.SeparatorMenuItem(),
+                    minimize, hideToTray, resetSize, close);
+        } else {
+            menu.getItems().addAll(addTodo, new javafx.scene.control.SeparatorMenuItem(), minimize, hideToTray, close);
+        }
         currentMenu = menu;
         menu.show(grid, x, y);
 
