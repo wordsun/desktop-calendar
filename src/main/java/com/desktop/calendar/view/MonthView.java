@@ -140,12 +140,6 @@ public class MonthView {
         MenuItem addTodo = new MenuItem(I18n.get("menu.addTodo") + " - " + dateStr);
         addTodo.setOnAction(e -> openTodoListDialog(date));
 
-        // 最小化到任务栏
-        MenuItem minimize = new MenuItem(I18n.get("menu.minimize"));
-        minimize.setOnAction(e -> {
-            ownerStage.setIconified(true);
-        });
-
         // 隐藏到托盘
         MenuItem hideToTray = new MenuItem(I18n.get("menu.hideToTray"));
         hideToTray.setOnAction(e -> {
@@ -169,9 +163,9 @@ public class MonthView {
             MenuItem resetSize = new MenuItem(I18n.get("settings.resetSize"));
             resetSize.setOnAction(e -> resetSizeCallback.run());
             menu.getItems().addAll(addTodo, new javafx.scene.control.SeparatorMenuItem(),
-                    minimize, hideToTray, resetSize, close);
+                    hideToTray, resetSize, close);
         } else {
-            menu.getItems().addAll(addTodo, new javafx.scene.control.SeparatorMenuItem(), minimize, hideToTray, close);
+            menu.getItems().addAll(addTodo, new javafx.scene.control.SeparatorMenuItem(), hideToTray, close);
         }
         currentMenu = menu;
         menu.show(grid, x, y);

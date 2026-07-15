@@ -3,6 +3,9 @@ package com.desktop.calendar;
 import com.desktop.calendar.service.*;
 import com.desktop.calendar.view.CalendarView;
 import com.desktop.calendar.view.SettingsDialog;
+import com.sun.jna.platform.win32.User32;
+import com.sun.jna.platform.win32.WinDef;
+import com.sun.jna.platform.win32.WinUser;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Cursor;
@@ -178,6 +181,9 @@ public class Main extends Application {
 
         primaryStage.show();
 
+        // 隐藏任务栏图标：设置 WS_EX_TOOLWINDOW 扩展样式
+        hideFromTaskbar();
+
         // Z-Order 保障：确保拖拽手柄始终在最顶层，不被内容区遮挡
         resizeHandle.toFront();
         resizeHandle.setMouseTransparent(false);
@@ -335,6 +341,20 @@ public class Main extends Application {
         WindowManager.saveScale(scaleFactor);
         WindowManager.savePosition(stage);
         resizeHandle.toFront();
+    }
+
+    /**
+     * 隐藏任务栏图标：通过 Win32 API 设置 WS_EX_TOOLWINDOW 扩展样式
+     * 使窗口仅显示在系统托盘，不占据任务栏空间
+     */
+    private static void hideFromTaskbar() {
+        // 通过窗口标题查找 JavaFX 原生窗口句柄
+        WinDef.HWND hwnd = User32.INSTANCE.FindWindow(null, "桌面日历");
+        if (hwnd != null) {
+            int exStyle = User32.INSTANCE.GetWindowLong(hwnd, WinUser.GWL_EXSTYLE);
+            // WS_EX_TOOLWINDOW = 0x80, 使窗口不显示在任务栏
+            User32.INSTANCE.SetWindowLong(hwnd, WinUser.GWL_EXSTYLE, exStyle | 0x80);
+        }
     }
 
     @Override
